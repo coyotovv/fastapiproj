@@ -34,7 +34,7 @@ def list_students():
     students = list(db.students.find({}))
     for student in students:
         student["id"] = str(student["_id"])
-        student.pop("_id") # Make sure to pop the original field
+        student.pop("_id") 
     return students
 
 @router.get("/{id}")
@@ -45,7 +45,7 @@ def get_student(id: str):
     student = db.students.find_one({"_id": ObjectId(id)})
     if student:
         student["id"] = str(student["_id"])
-        student.pop("_id") # Make sure to pop the original field
+        student.pop("_id") 
         return student
     else:
         raise HTTPException(status_code=404, detail="Student not found")

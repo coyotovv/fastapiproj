@@ -5,7 +5,7 @@ from database import db
 from models.course import Course
 from typing import Optional
 from datetime import datetime
-from pymongo import ReturnDocument # Add this line!
+from pymongo import ReturnDocument
 
 router = APIRouter(
     prefix="/courses",
@@ -19,20 +19,15 @@ class CourseOut(BaseModel):
     instructor_id: str
     creation_date: datetime
 
-# ... the rest of your code
-
-# ... the rest of your code here
-# ... your router setup and CourseOut model here
-
 @router.post("/", response_model=CourseOut, status_code=status.HTTP_201_CREATED)
 def create_course(course: Course):
-    # This is the correct way to handle datetime fields
+
     course_dict = course.dict()
     
-    # We add a check for the instructor_id later. For now, we'll just insert.
+
     result = db.courses.insert_one(course_dict)
     
-    # This code converts the _id from ObjectId to a string before returning
+
     course_dict["id"] = str(result.inserted_id)
     
     return course_dict

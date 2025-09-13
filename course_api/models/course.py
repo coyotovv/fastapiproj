@@ -5,5 +5,5 @@ from datetime import datetime
 class Course(BaseModel):
     title: str
     description: Optional[str] = None
-    instructor_id: str  # ID of the instructor
+    instructor_id: str
     creation_date: datetime = datetime.now()
