@@ -1,13 +1,9 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel
 from typing import Optional
-from bson import ObjectId
-from .instructor import PyObjectId 
+from datetime import datetime
 
 class Course(BaseModel):
-    id: Optional[PyObjectId] = Field(alias="_id")
-    name: str
-    instructor_id: str
-    
-    class Config:
-        json_encoders = {ObjectId: str}
-        populate_by_name = True
+    title: str
+    description: Optional[str] = None
+    instructor_id: str  # ID of the instructor
+    creation_date: datetime = datetime.now()

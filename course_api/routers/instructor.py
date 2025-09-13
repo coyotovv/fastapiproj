@@ -1,45 +1,75 @@
-# file: routers/instructor.py
-from fastapi import APIRouter, HTTPException
-from typing import List
+from fastapi import APIRouter, status
+from bson import ObjectId
+from pydantic import BaseModel
 from models.instructor import Instructor
-# We need to import all our CRUD functions here.
-from crud.instructor import (
-    create_instructor,
-    get_all_instructors,
-    get_instructor_by_id,
-    update_instructor,
-    delete_instructor
+from database import db
+from pymongo import ReturnDocument
+
+# APIRouter for defining our endpoints
+router = APIRouter(
+    prefix="/instructors",
+    tags=["Instructors"]
 )
 
-router = APIRouter()
+# Pydantic model for response (so we don't return the MongoDB ObjectId)
+class InstructorOut(BaseModel):
+    id: str
+    name: str
+    email: str
+    bio: str | None = None
 
-@router.post("/", response_model=str, tags=["Instructors"])
-def create_new_instructor(instructor: Instructor):
-    return create_instructor(instructor)
 
-@router.get("/", response_model=List[Instructor], tags=["Instructors"])
-def list_instructors():
-    return get_all_instructors()
 
-@router.get("/{id}", response_model=Instructor, tags=["Instructors"])
-def get_instructor(id: str):
-    instructor = get_instructor_by_id(id)
-    if instructor is None:
+
+
+# POST endpoint to create a new instructor
+@router.post("/", response_model=InstructorOut, status_code=status.HTTP_201_CREATED)
+def create_instructor(instructor: Instructor):
+    instructor_dict = instructor.dict()
+    # Insert the new instructor document into the 'instructors' collection
+    result = db.instructors.insert_one(instructor_dict)
+    
+    # Return the newly created instructor data with the generated ID
+    return {
+        "id": str(result.inserted_id),
+        **instructor.dict()
+    }
+
+
+
+
+
+@router.put("/{id}", response_model=InstructorOut)
+def update_instructor(id: str, instructor: Instructor):
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=400, detail="Invalid instructor ID format")
+
+    updated_instructor = db.instructors.find_one_and_update(
+        {"_id": ObjectId(id)},
+        {"$set": instructor.dict()},
+        return_document=ReturnDocument.AFTER
+    )
+    
+    if updated_instructor:
+        # Convert the MongoDB ObjectId to a string before returning
+        updated_instructor["id"] = str(updated_instructor["_id"])
+        # Remove the ObjectId field from the dictionary
+        updated_instructor.pop("_id")
+        return updated_instructor
+    else:
         raise HTTPException(status_code=404, detail="Instructor not found")
-    return instructor
 
-@router.put("/{id}", response_model=bool, tags=["Instructors"])
-def update_instructor(id: str, instructor_data: dict):
-    # Call the CRUD function and return its boolean result.
-    was_updated = update_instructor(id, instructor_data)
-    if not was_updated:
-        raise HTTPException(status_code=404, detail="Instructor not found")
-    return was_updated
 
-@router.delete("/{id}", response_model=bool, tags=["Instructors"])
+
+
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_instructor(id: str):
-    # Call the CRUD function and return its boolean result.
-    was_deleted = delete_instructor(id)
-    if not was_deleted:
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=400, detail="Invalid instructor ID format")
+
+    deleted_instructor = db.instructors.find_one_and_delete({"_id": ObjectId(id)})
+    if not deleted_instructor:
         raise HTTPException(status_code=404, detail="Instructor not found")
-    return was_deleted
+
+    return None # We return None for 204 No Content status

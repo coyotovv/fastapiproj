@@ -1,48 +1,68 @@
-# file: routers/course.py
-from fastapi import APIRouter, HTTPException
-from typing import List, Optional
+from fastapi import APIRouter, status, HTTPException
+from pydantic import BaseModel
+from bson import ObjectId
+from database import db
 from models.course import Course
-from crud.course import (
-    create_course,
-    get_all_courses,
-    get_course_by_id,
-    get_courses_by_instructor_id,
-    update_course,
-    delete_course
+from typing import Optional
+from datetime import datetime
+from pymongo import ReturnDocument # Add this line!
+
+router = APIRouter(
+    prefix="/courses",
+    tags=["Courses"]
 )
 
-router = APIRouter()
+class CourseOut(BaseModel):
+    id: str
+    title: str
+    description: Optional[str] = None
+    instructor_id: str
+    creation_date: datetime
 
-@router.post("/", response_model=str, tags=["Courses"])
-def create_new_course(course: Course):
-    return create_course(course)
+# ... the rest of your code
 
-@router.get("/", response_model=List[Course], tags=["Courses"])
-def list_courses():
-    return get_all_courses()
+# ... the rest of your code here
+# ... your router setup and CourseOut model here
 
-@router.get("/{id}", response_model=Course, tags=["Courses"])
-def get_course(id: str):
-    course = get_course_by_id(id)
-    if course is None:
+@router.post("/", response_model=CourseOut, status_code=status.HTTP_201_CREATED)
+def create_course(course: Course):
+    # This is the correct way to handle datetime fields
+    course_dict = course.dict()
+    
+    # We add a check for the instructor_id later. For now, we'll just insert.
+    result = db.courses.insert_one(course_dict)
+    
+    # This code converts the _id from ObjectId to a string before returning
+    course_dict["id"] = str(result.inserted_id)
+    
+    return course_dict
+
+
+@router.put("/{id}", response_model=CourseOut)
+def update_course(id: str, course: Course):
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=400, detail="Invalid course ID format")
+
+    updated_course = db.courses.find_one_and_update(
+        {"_id": ObjectId(id)},
+        {"$set": course.dict()},
+        return_document=ReturnDocument.AFTER
+    )
+    
+    if updated_course:
+        updated_course["id"] = str(updated_course["_id"])
+        updated_course.pop("_id")
+        return updated_course
+    else:
         raise HTTPException(status_code=404, detail="Course not found")
-    return course
 
-@router.get("/by-instructor/{instructor_id}", response_model=List[Course], tags=["Courses"])
-def list_courses_by_instructor(instructor_id: str):
-    courses = get_courses_by_instructor_id(instructor_id)
-    return courses
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_course(id: str):
+    if not ObjectId.is_valid(id):
+        raise HTTPException(status_code=400, detail="Invalid course ID format")
 
-@router.put("/{id}", response_model=bool, tags=["Courses"])
-def update_course_data(id: str, course_data: dict):
-    was_updated = update_course(id, course_data)
-    if not was_updated:
+    deleted_course = db.courses.find_one_and_delete({"_id": ObjectId(id)})
+    if not deleted_course:
         raise HTTPException(status_code=404, detail="Course not found")
-    return was_updated
 
-@router.delete("/{id}", response_model=bool, tags=["Courses"])
-def delete_course_data(id: str):
-    was_deleted = delete_course(id)
-    if not was_deleted:
-        raise HTTPException(status_code=404, detail="Course not found")
-    return was_deleted
+    return None
