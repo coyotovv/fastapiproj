@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from models.instructor import Instructor
 from database import db
 from pymongo import ReturnDocument
+from fastapi import HTTPException
 
 
 router = APIRouter(
@@ -31,8 +32,6 @@ def create_instructor(instructor: Instructor):
         "id": str(result.inserted_id),
         **instructor.dict()
     }
-
-
 
 
 
@@ -70,3 +69,15 @@ def delete_instructor(id: str):
         raise HTTPException(status_code=404, detail="Instructor not found")
 
     return None
+
+
+@router.get("/")
+def list_instructors():
+    instructors = list(db.instructors.find({}))
+    
+    # We need to convert the MongoDB ObjectId to a string for each item
+    for instructor in instructors:
+        instructor["id"] = str(instructor["_id"])
+        instructor.pop("_id") # Make sure to pop the original field
+    
+    return instructors

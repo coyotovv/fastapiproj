@@ -24,9 +24,7 @@ def create_course(course: Course):
 
     course_dict = course.dict()
     
-
     result = db.courses.insert_one(course_dict)
-    
 
     course_dict["id"] = str(result.inserted_id)
     
@@ -61,3 +59,15 @@ def delete_course(id: str):
         raise HTTPException(status_code=404, detail="Course not found")
 
     return None
+
+
+@router.get("/")
+def list_courses():
+    courses = list(db.courses.find({}))
+    
+
+    for course in courses:
+        course["id"] = str(course["_id"])
+        course.pop("_id")
+
+    return courses
